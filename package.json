@@ -1,0 +1,33 @@
+{
+  "name": "@labdee/cf-tools",
+  "version": "0.0.1",
+  "description": "Utility to",
+  "author": "Diêgo Silva",
+  "keywords": [
+    "SAP",
+    "Cloud",
+    "Foundry",
+    "Local",
+    "Development",
+    "Utility",
+    "CLI"
+  ],
+  "license": "MIT",
+  "repository": "labdee/cf-tools",
+  "homepage": "https://github.com/labdee/cf-tools",
+  "bugs": {
+    "url": "https://github.com/labdee/cf-tools/issues"
+  },
+  "main": "src/index.js",
+  "bin": {
+    "cf-tools": "./bin/cf-tools.js"
+  },
+  "preferGlobal": true,
+  "devDependencies": {
+    "jest": "^29.3.1"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "yargs": "^17.6.2"
+  }
+}

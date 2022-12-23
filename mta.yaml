@@ -1,0 +1,54 @@
+_schema-version: "3.2"
+ID: corvias-proxy-nodejs
+version: 0.0.1
+modules:
+  - name: corvias-proxy-nodejs
+    type: javascript.nodejs
+    path: .
+    parameters:
+      disk-quota: 256M
+      memory: 256M
+      command: npm run start:prod
+      routes:
+        - route: corvias-proxy.${default-domain}
+    build-parameters:
+      # build-result: dist
+      builder: custom
+      commands:
+        - npm install
+        - npm run build
+    requires:
+      - name: corvias-proxy-nodejs-destination-service
+        parameters:
+          content-target: true
+  - name: corvias-proxy-nodejs-destination-content
+    type: com.sap.application.content
+    requires:
+      - name: corvias-proxy-nodejs-xsuaa-service
+      - name: corvias-proxy-nodejs-destination-service
+        parameters:
+          service-key:
+            name: corvias-proxy-nodejs-xsuaa-service-key
+    parameters:
+      content:
+        subaccount:
+          destinations:
+            - Name: GatewayProxy
+              URL: http://localhost:3001/
+          existing_destinations_policy: ignore
+    build-parameters:
+      no-source: true
+resources:
+  - name: corvias-proxy-nodejs-destination-service
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: destination
+      service-name: corvias-proxy-nodejs-destination-service
+      service-plan: lite
+  - name: corvias-proxy-nodejs-xsuaa-service
+    type: org.cloudfoundry.managed-service
+    parameters:
+      path: ./xs-security.json
+      service: xsuaa
+      service-name: corvias-proxy-nodejs-xsuaa-service
+      service-plan: application
