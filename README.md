@@ -2,6 +2,11 @@
 
 LabDee CF Tools is a command-line interface (CLI) tool that helps with local development of SAP Cloud Foundry applications.
 
+## Pre-requisites
+
+- Node.js 8.9.0 or higher
+- Cloud Foundry CLI
+
 ## Installation
 
 To install the package, run the following command:
@@ -18,13 +23,16 @@ To use the CLI tool, run the `cf-tools` command followed by a command and any ne
 
 ### `prepare-local`
 
-Prepares the application to run locally.
+Prepares the application to run locally. It generates the following files based on `cf env` command:
 
-`cf-tools prepare-local -a [appName]`
+- default-env.json
+- .env
+
+`cf-tools prepare-local`
 
 Options:
 
-- `-a, --appName`: The name of the application.
+- `-a, --appName`: The name of the application (if not provided, the CLI will try to guess).
 
 ### `-v, --version`
 
