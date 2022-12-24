@@ -64,15 +64,53 @@ async function getEnvs(appName, envNames) {
   });
 }
 
+function addToGitIgnore(strs) {
+  const newLine = `
+`;
+
+  if (!Array.isArray(strs)) {
+    strs = [strs];
+  }
+
+  if (!fs.existsSync(".gitignore")) {
+    fs.writeFileSync(".gitignore", "");
+  }
+
+  var gitIgnoreContent = fs.readFileSync(".gitignore").toString();
+
+  if (gitIgnoreContent.length > 0 && !gitIgnoreContent.endsWith(newLine))
+    gitIgnoreContent += newLine;
+
+  for (var i = 0; i < strs.length; i++) {
+    var str = strs[i];
+    if (!gitIgnoreContent.includes(str)) {
+      gitIgnoreContent += str + newLine;
+
+      console.log(`Added "${str}" to .gitignore`);
+    }
+  }
+
+  fs.writeFileSync(".gitignore", gitIgnoreContent);
+}
+
 async function prepareLocalEnvironment(appName) {
+  addToGitIgnore([".cf-tools", "default-env.json", "*.bak"]);
+
   const envs = await getEnvs(appName, ["VCAP_SERVICES", "VCAP_APPLICATION"]);
 
   const defaultEnvContent = JSON.stringify(envs);
 
   if (fs.existsSync("default-env.json")) {
-    fs.renameSync("default-env.json", "default-env.json.bak");
-    console.log("default-env.json.bak: backup file created");
+    if (!fs.existsSync(".cf-tools")) {
+      fs.mkdirSync(".cf-tools");
+    }
+
+    const backupContent = fs.readFileSync("default-env.json");
+    fs.writeFileSync(".cf-tools/default-env.json.bak", backupContent);
+
+    console.log("Backup of default-env.json saved at .cf-tools");
   }
+
   fs.writeFileSync("default-env.json", defaultEnvContent);
   console.log("default-env.json: file created/updated");
 }
