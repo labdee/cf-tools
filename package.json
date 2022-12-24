@@ -22,6 +22,9 @@
   "bin": {
     "cf-tools": "./bin/cf-tools.js"
   },
+  "scripts": {
+    "test": "jest"
+  },
   "preferGlobal": true,
   "devDependencies": {
     "jest": "^29.3.1"

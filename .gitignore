@@ -145,3 +145,4 @@ dist
 .cf-tools
 default-env.json
 *.bak
+mta.yaml

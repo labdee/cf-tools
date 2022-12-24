@@ -2,8 +2,11 @@ const { APP_NOT_DEPLOYED_ERROR } = require("../constants/errors");
 const fs = require("fs");
 const exec = require("child_process").exec;
 
-function getEnvFromOutput(envName, output) {
-  var valueSplit = output.split(envName);
+const NEW_LINE = `
+`;
+
+function getEnvFromCfStdout(cfStdout, envName) {
+  var valueSplit = cfStdout.split(envName);
 
   if (valueSplit.length < 2) {
     return { [envName]: null };
@@ -38,11 +41,90 @@ function getEnvFromOutput(envName, output) {
   }
 }
 
-async function getEnvs(appName, envNames) {
-  if (!Array.isArray(envNames)) {
-    envNames = [envNames];
+function getEnvFileContentFromCfStdout(cfStdout) {
+  const groupedEnv = getGroupedEnvFromCfStdout(cfStdout);
+  const userProvidedValue = groupedEnv["User-Provided"];
+
+  if (!userProvidedValue) return null;
+
+  const userProvidedLines = userProvidedValue.split(NEW_LINE);
+  var envFileContent = "";
+  for (var i = 0; i < userProvidedLines.length; i++) {
+    var line = userProvidedLines[i];
+    if (line.includes(":")) {
+      var split = line.split(":");
+      var envName = split[0].trim();
+      var envValue = split.slice(1).join(":").trim();
+
+      // if envValue contains {, is a JSON
+      if (envValue.includes("{")) {
+        var openingBraceCount = 1;
+        var closingBraceCount = 0;
+        for (var j = i + 1; j < userProvidedLines.length; j++) {
+          var nextLine = userProvidedLines[j];
+          for (var k = 0; k < nextLine.length; k++) {
+            if (nextLine[k] === "{") {
+              openingBraceCount++;
+            } else if (nextLine[k] === "}") {
+              closingBraceCount++;
+            }
+
+            envValue += nextLine[k];
+          }
+
+          if (
+            openingBraceCount > 0 &&
+            closingBraceCount > 0 &&
+            openingBraceCount === closingBraceCount
+          ) {
+            i = j;
+
+            envValue = JSON.stringify(JSON.parse(envValue));
+
+            break;
+          }
+        }
+      }
+
+      envFileContent += envName + "=" + envValue + NEW_LINE;
+    }
   }
 
+  return envFileContent.trim();
+}
+
+function getGroupedEnvFromCfStdout(cfStdout) {
+  var lines = cfStdout.split(`
+
+`);
+  var envs = {};
+  var envName = null;
+  var envValue = null;
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i];
+
+    if (line.includes(":")) {
+      if (envName) {
+        envs[envName] = envValue;
+      }
+
+      // split by the first : only
+      var split = line.split(":");
+      envName = split[0].trim();
+
+      // envValue is the rest of the line after the first :
+      envValue = split.slice(1).join(":").trim();
+    }
+  }
+
+  if (envName) {
+    envs[envName] = envValue;
+  }
+
+  return envs;
+}
+
+async function getCfEnvStdout(appName) {
   return new Promise((resolve, reject) => {
     const cmd = "cf env " + appName;
 
@@ -51,23 +133,61 @@ async function getEnvs(appName, envNames) {
         reject(APP_NOT_DEPLOYED_ERROR);
       }
 
-      var envs = {};
-      for (var i = 0; i < envNames.length; i++) {
-        var envName = envNames[i];
-        var envValue = getEnvFromOutput(envName, stdout);
-        envs[envName] = envValue;
-      }
-
-      resolve(envs);
+      resolve(stdout);
       return;
     });
   });
 }
 
-function addToGitIgnore(strs) {
-  const newLine = `
-`;
+async function getEnvs(appName, envNames, cfEnvStdout) {
+  try {
+    if (!Array.isArray(envNames)) envNames = [envNames];
+    if (!cfEnvStdout) cfEnvStdout = await getCfEnvStdout(appName);
 
+    var envs = {};
+    for (var i = 0; i < envNames.length; i++) {
+      var envName = envNames[i];
+      var envValue = getEnvFromCfStdout(cfEnvStdout, envName);
+      envs[envName] = envValue;
+    }
+
+    return envs;
+  } catch (e) {
+    throw new Error(APP_NOT_DEPLOYED_ERROR);
+  }
+}
+
+async function prepareLocalEnvironment(appName) {
+  await prepareDefaultEnv(appName);
+}
+
+async function prepareDefaultEnv(appName) {
+  backupFile("default-env.json");
+
+  const envs = await getEnvs(appName, ["VCAP_SERVICES", "VCAP_APPLICATION"]);
+
+  const defaultEnvContent = JSON.stringify(envs);
+
+  fs.writeFileSync("default-env.json", defaultEnvContent);
+  console.log("default-env.json: file created/updated");
+}
+
+async function backupFile(filePath) {
+  if (fs.existsSync(filePath)) {
+    if (!fs.existsSync(".cf-tools")) {
+      fs.mkdirSync(".cf-tools");
+    }
+
+    const backupContent = fs.readFileSync(filePath);
+    fs.writeFileSync(`.cf-tools/${filePath}.bak`, backupContent);
+
+    console.log(`Backup of ${filePath}. saved at .cf-tools`);
+  }
+
+  addToGitIgnore([".cf-tools", filePath, "*.bak"]);
+}
+
+function addToGitIgnore(strs) {
   if (!Array.isArray(strs)) {
     strs = [strs];
   }
@@ -78,13 +198,13 @@ function addToGitIgnore(strs) {
 
   var gitIgnoreContent = fs.readFileSync(".gitignore").toString();
 
-  if (gitIgnoreContent.length > 0 && !gitIgnoreContent.endsWith(newLine))
-    gitIgnoreContent += newLine;
+  if (gitIgnoreContent.length > 0 && !gitIgnoreContent.endsWith(NEW_LINE))
+    gitIgnoreContent += NEW_LINE;
 
   for (var i = 0; i < strs.length; i++) {
     var str = strs[i];
     if (!gitIgnoreContent.includes(str)) {
-      gitIgnoreContent += str + newLine;
+      gitIgnoreContent += str + NEW_LINE;
 
       console.log(`Added "${str}" to .gitignore`);
     }
@@ -93,30 +213,9 @@ function addToGitIgnore(strs) {
   fs.writeFileSync(".gitignore", gitIgnoreContent);
 }
 
-async function prepareLocalEnvironment(appName) {
-  addToGitIgnore([".cf-tools", "default-env.json", "*.bak"]);
-
-  const envs = await getEnvs(appName, ["VCAP_SERVICES", "VCAP_APPLICATION"]);
-
-  const defaultEnvContent = JSON.stringify(envs);
-
-  if (fs.existsSync("default-env.json")) {
-    if (!fs.existsSync(".cf-tools")) {
-      fs.mkdirSync(".cf-tools");
-    }
-
-    const backupContent = fs.readFileSync("default-env.json");
-    fs.writeFileSync(".cf-tools/default-env.json.bak", backupContent);
-
-    console.log("Backup of default-env.json saved at .cf-tools");
-  }
-
-  fs.writeFileSync("default-env.json", defaultEnvContent);
-  console.log("default-env.json: file created/updated");
-}
-
 module.exports = {
   getEnvs,
-  getEnvFromOutput,
+  getEnvFromCfStdout,
+  getEnvFileContentFromCfStdout,
   prepareLocalEnvironment,
 };

@@ -1,13 +1,13 @@
 _schema-version: "3.2"
-ID: corvias-proxy-nodejs
+ID: corvias-proxy
 version: 0.0.1
 modules:
-  - name: corvias-proxy-nodejs
+  - name: corvias-proxy
     type: javascript.nodejs
     path: .
     parameters:
-      disk-quota: 256M
-      memory: 256M
+      disk-quota: 1G
+      memory: 1G
       command: npm run start:prod
       routes:
         - route: corvias-proxy.${default-domain}
@@ -18,37 +18,31 @@ modules:
         - npm install
         - npm run build
     requires:
-      - name: corvias-proxy-nodejs-destination-service
-        parameters:
-          content-target: true
-  - name: corvias-proxy-nodejs-destination-content
-    type: com.sap.application.content
-    requires:
-      - name: corvias-proxy-nodejs-xsuaa-service
-      - name: corvias-proxy-nodejs-destination-service
+      - name: corvias-proxy-xsuaa-service
         parameters:
           service-key:
-            name: corvias-proxy-nodejs-xsuaa-service-key
-    parameters:
-      content:
-        subaccount:
-          destinations:
-            - Name: GatewayProxy
-              URL: http://localhost:3001/
-          existing_destinations_policy: ignore
-    build-parameters:
-      no-source: true
+            name: corvias-proxy-xsuaa-service-key
+      - name: corvias-destination-service
+      - name: corvias-connectivity-service
+        parameters:
+          content-target: true
 resources:
-  - name: corvias-proxy-nodejs-destination-service
+  - name: corvias-destination-service
     type: org.cloudfoundry.managed-service
     parameters:
       service: destination
-      service-name: corvias-proxy-nodejs-destination-service
+      service-name: corvias-destination-service
       service-plan: lite
-  - name: corvias-proxy-nodejs-xsuaa-service
+  - name: corvias-connectivity-service
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: connectivity
+      service-name: corvias-connectivity-service
+      service-plan: lite
+  - name: corvias-proxy-xsuaa-service
     type: org.cloudfoundry.managed-service
     parameters:
       path: ./xs-security.json
       service: xsuaa
-      service-name: corvias-proxy-nodejs-xsuaa-service
+      service-name: corvias-proxy-xsuaa-service
       service-plan: application
