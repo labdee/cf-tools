@@ -1,8 +1,8 @@
 {
   "name": "@labdee/cf-tools",
   "version": "0.0.1",
-  "description": "Utility to",
-  "author": "Diêgo Silva",
+  "description": "CF Utility Tools",
+  "author": "LabDee",
   "keywords": [
     "SAP",
     "Cloud",
