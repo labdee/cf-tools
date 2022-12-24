@@ -139,10 +139,9 @@ async function getCfEnvStdout(appName) {
   });
 }
 
-async function getEnvs(appName, envNames, cfEnvStdout) {
+async function getEnvs(cfEnvStdout, envNames) {
   try {
     if (!Array.isArray(envNames)) envNames = [envNames];
-    if (!cfEnvStdout) cfEnvStdout = await getCfEnvStdout(appName);
 
     var envs = {};
     for (var i = 0; i < envNames.length; i++) {
@@ -157,19 +156,36 @@ async function getEnvs(appName, envNames, cfEnvStdout) {
   }
 }
 
-async function prepareLocalEnvironment(appName) {
-  await prepareDefaultEnv(appName);
+async function prepareLocalEnvironmentFromCf(appName) {
+  const cfEnvStdout = await getCfEnvStdout(appName);
+
+  await generateDefaultEnvFromCf(cfEnvStdout);
+  await generateDotEnvFromCf(cfEnvStdout);
 }
 
-async function prepareDefaultEnv(appName) {
-  backupFile("default-env.json");
+async function generateDefaultEnvFromCf(cfEnvStdout) {
+  const fileName = "default-env.json";
+  backupFile(fileName);
 
-  const envs = await getEnvs(appName, ["VCAP_SERVICES", "VCAP_APPLICATION"]);
+  const envs = await getEnvs(cfEnvStdout, [
+    "VCAP_SERVICES",
+    "VCAP_APPLICATION",
+  ]);
 
   const defaultEnvContent = JSON.stringify(envs);
 
-  fs.writeFileSync("default-env.json", defaultEnvContent);
-  console.log("default-env.json: file created/updated");
+  fs.writeFileSync(fileName, defaultEnvContent);
+  console.log(`${fileName}: file created/updated`);
+}
+
+async function generateDotEnvFromCf(cfEnvStdout) {
+  const fileName = ".env";
+  backupFile(fileName);
+
+  const dotEnvContent = getEnvFileContentFromCfStdout(cfEnvStdout);
+
+  fs.writeFileSync(fileName, dotEnvContent);
+  console.log(`${fileName}: file created/updated`);
 }
 
 async function backupFile(filePath) {
@@ -217,5 +233,5 @@ module.exports = {
   getEnvs,
   getEnvFromCfStdout,
   getEnvFileContentFromCfStdout,
-  prepareLocalEnvironment,
+  prepareLocalEnvironmentFromCf,
 };

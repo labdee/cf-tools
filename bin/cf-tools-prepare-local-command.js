@@ -7,7 +7,7 @@ const cmd = {
   handler: async (yargs) => {
     const appName = yargs.appName ?? (await CFTools.CFAppUtils.getAppName());
 
-    return await CFTools.CFEnvUtils.prepareLocalEnvironment(appName)
+    return await CFTools.CFEnvUtils.prepareLocalEnvironmentFromCf(appName)
       .then((env) => {
         // console.log(env);
       })
